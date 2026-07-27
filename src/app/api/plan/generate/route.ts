@@ -11,6 +11,11 @@ import {
   type ActionPlanOutput,
   type GoalInput,
 } from "@/lib/schematic";
+import {
+  getWeekAssignment,
+  weekClassificationPromptLines,
+  weeklyPlanKey,
+} from "@/lib/week-utils";
 
 const SCOPE_LABELS: Record<GoalInput["scope"], string> = {
   SHORT_TERM: "1~3 months",
@@ -21,14 +26,6 @@ const SCOPE_LABELS: Record<GoalInput["scope"], string> = {
 function parseDateOnly(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));
-}
-
-function getWeekOfMonth(date: Date): number {
-  return Math.ceil(date.getUTCDate() / 7);
-}
-
-function weeklyPlanKey(year: number, month: number, weekNumber: number): string {
-  return `${year}-${month}-${weekNumber}`;
 }
 
 function buildActionPlanPrompt(input: GoalInput): string {
@@ -56,7 +53,7 @@ function buildActionPlanPrompt(input: GoalInput): string {
     "- Cover the full period from startDate through endDate.",
     "- Assign dailyTasks only on dates within [startDate, endDate] (YYYY-MM-DD).",
     "- Distribute daily tasks precisely across the date range — avoid large gaps unless realistic rest is intended.",
-    "- Use weekNumber as the week index within each month (1 = days 1-7, 2 = days 8-14, 3 = days 15-21, 4 = days 22-28, 5 = remaining days).",
+    ...weekClassificationPromptLines(),
     "- Keep daily task content concrete and executable within estimatedMin minutes.",
     "- Align monthly themes and weekly focus goals with the yearly summaries.",
     "- Write summary as a concise overview of the entire action plan.",
@@ -67,9 +64,7 @@ function resolveWeeklyPlanId(
   weeklyPlanIds: Map<string, string>,
   taskDate: Date,
 ): string {
-  const year = taskDate.getUTCFullYear();
-  const month = taskDate.getUTCMonth() + 1;
-  const weekNumber = getWeekOfMonth(taskDate);
+  const { year, month, weekNumber } = getWeekAssignment(taskDate);
 
   let weeklyPlanId = weeklyPlanIds.get(
     weeklyPlanKey(year, month, weekNumber),
