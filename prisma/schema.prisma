@@ -1,5 +1,5 @@
-// Supabase: existing DB has public.profiles -> auth.users FK.
-// Use `npm run db:migrate` (migrate deploy), not `migrate dev` (P4002).
+// Shared Supabase DB (Focal / My Planner). Do NOT use public.profiles here.
+// Goal.userId stores auth.users.id directly. Use `npm run db:migrate`, not `migrate dev`.
 
 generator client {
   provider = "prisma-client-js"
@@ -26,6 +26,7 @@ enum TaskStatus {
 
 model Goal {
   id          String    @id @default(cuid())
+  userId      String?   @db.Uuid // auth.users.id — not linked to Focal public.profiles
   title       String
   description String
   scope       GoalScope
@@ -37,6 +38,7 @@ model Goal {
   yearlyPlans YearlyPlan[]
 
   @@index([scope])
+  @@index([userId])
 }
 
 model YearlyPlan {

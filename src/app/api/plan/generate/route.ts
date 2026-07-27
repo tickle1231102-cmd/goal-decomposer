@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { requireCurrentUser } from "@/lib/auth";
 import {
   ActionPlanOutputSchema,
   GoalInputSchema,
@@ -152,11 +153,13 @@ function resolveWeeklyPlanId(
 async function persistActionPlan(
   input: GoalInput,
   actionPlan: ActionPlanOutput,
+  userId: string,
 ) {
   return prisma.$transaction(
     async (tx) => {
       const goal = await tx.goal.create({
         data: {
+          userId,
           title: input.title,
           description: input.description ?? "",
           scope: input.scope as GoalScope,
@@ -282,6 +285,12 @@ function jsonError(message: string, status: number, code?: string) {
 
 export async function POST(request: Request) {
   try {
+    const user = await requireCurrentUser();
+
+    if (!user) {
+      return jsonError("Unauthorized", 401, "UNAUTHORIZED");
+    }
+
     const geminiApiKey =
       process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? process.env.GEMINI_API_KEY;
 
@@ -311,7 +320,7 @@ export async function POST(request: Request) {
 
     const actionPlan = filterExcludedDailyTasks(rawActionPlan, input);
 
-    const goal = await persistActionPlan(input, actionPlan);
+    const goal = await persistActionPlan(input, actionPlan, user.id);
 
     return NextResponse.json({ data: goal }, { status: 201 });
   } catch (error) {

@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { PlanDashboard } from "@/components/PlanDashboard";
 import { Button } from "@/components/ui/button";
+import { requireCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeGoal } from "@/lib/plan-types";
 
@@ -11,9 +12,9 @@ type GoalPageProps = {
   params: Promise<{ id: string }>;
 };
 
-async function getGoalWithActionPlan(id: string) {
-  return prisma.goal.findUnique({
-    where: { id },
+async function getGoalWithActionPlan(id: string, userId: string) {
+  return prisma.goal.findFirst({
+    where: { id, userId },
     include: {
       yearlyPlans: {
         orderBy: { year: "asc" },
@@ -38,8 +39,14 @@ async function getGoalWithActionPlan(id: string) {
 }
 
 export default async function GoalPage({ params }: GoalPageProps) {
+  const user = await requireCurrentUser();
+
+  if (!user) {
+    notFound();
+  }
+
   const { id } = await params;
-  const goal = await getGoalWithActionPlan(id);
+  const goal = await getGoalWithActionPlan(id, user.id);
 
   if (!goal) {
     notFound();
@@ -55,7 +62,7 @@ export default async function GoalPage({ params }: GoalPageProps) {
           </p>
         </div>
         <Button asChild className="shrink-0">
-          <Link href="/">
+          <Link href="/home">
             <Plus className="size-4" />
             새 목표 추가
           </Link>

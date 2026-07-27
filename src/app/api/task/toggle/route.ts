@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { requireCurrentUser, taskBelongsToUser } from "@/lib/auth";
 
 const UpdateTaskStatusSchema = z.object({
   taskId: z.string().min(1),
@@ -18,14 +19,18 @@ function jsonError(message: string, status: number, code?: string) {
 
 export async function PATCH(request: Request) {
   try {
+    const user = await requireCurrentUser();
+
+    if (!user) {
+      return jsonError("Unauthorized", 401, "UNAUTHORIZED");
+    }
+
     const body: unknown = await request.json();
     const { taskId, status } = UpdateTaskStatusSchema.parse(body);
 
-    const task = await prisma.dailyTask.findUnique({
-      where: { id: taskId },
-    });
+    const ownsTask = await taskBelongsToUser(taskId, user.id);
 
-    if (!task) {
+    if (!ownsTask) {
       return jsonError("Task not found.", 404, "TASK_NOT_FOUND");
     }
 
