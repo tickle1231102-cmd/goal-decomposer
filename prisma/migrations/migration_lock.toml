@@ -1,0 +1,2 @@
+# Please edit manually! your migrations will throw an error if this file is an invalid migration!
+provider = "postgresql"

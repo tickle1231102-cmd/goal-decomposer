@@ -1,0 +1,91 @@
+// Supabase: existing DB has public.profiles -> auth.users FK.
+// Use `npm run db:migrate` (migrate deploy), not `migrate dev` (P4002).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// SHORT_TERM: 1~3 months | MID_TERM: 3~6 months | LONG_TERM: 1+ year
+enum GoalScope {
+  SHORT_TERM
+  MID_TERM
+  LONG_TERM
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  scope       GoalScope
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  yearlyPlans YearlyPlan[]
+
+  @@index([scope])
+}
+
+model YearlyPlan {
+  id      String @id @default(cuid())
+  goalId  String
+  year    Int
+  summary String
+
+  goal         Goal          @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  monthlyPlans MonthlyPlan[]
+
+  @@index([goalId])
+}
+
+model MonthlyPlan {
+  id           String @id @default(cuid())
+  yearlyPlanId String
+  month        Int
+  theme        String
+
+  yearlyPlan  YearlyPlan   @relation(fields: [yearlyPlanId], references: [id], onDelete: Cascade)
+  weeklyPlans WeeklyPlan[]
+
+  @@index([yearlyPlanId])
+}
+
+model WeeklyPlan {
+  id            String @id @default(cuid())
+  monthlyPlanId String
+  weekNumber    Int
+  focusGoal     String
+
+  monthlyPlan MonthlyPlan @relation(fields: [monthlyPlanId], references: [id], onDelete: Cascade)
+  dailyTasks  DailyTask[]
+
+  @@index([monthlyPlanId])
+}
+
+model DailyTask {
+  id           String     @id @default(cuid())
+  weeklyPlanId String
+  date         DateTime
+  content      String
+  estimatedMin Int
+  status       TaskStatus @default(TODO)
+
+  weeklyPlan WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+
+  @@index([weeklyPlanId])
+  @@index([date])
+  @@index([status])
+}
