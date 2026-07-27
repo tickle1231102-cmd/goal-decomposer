@@ -61,7 +61,7 @@ export function LoginForm() {
     try {
       const supabase = createClient();
       const origin = getClientAppOrigin();
-      const redirectTo = buildAuthCallbackUrl(origin, "/home");
+      const redirectTo = buildAuthCallbackUrl(origin, "/");
 
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -101,7 +101,7 @@ export function LoginForm() {
         throw guestError;
       }
 
-      router.push("/home");
+      router.push("/");
       router.refresh();
     } catch (loginError) {
       setError(

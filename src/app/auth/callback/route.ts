@@ -6,9 +6,9 @@ import { getAppOrigin } from "@/lib/auth-url";
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/home";
+  const next = searchParams.get("next") ?? "/";
   const origin = getAppOrigin(request);
-  const safeNext = next.startsWith("/") ? next : "/home";
+  const safeNext = next.startsWith("/") ? next : "/";
   const redirectUrl = `${origin}${safeNext}`;
 
   if (code) {

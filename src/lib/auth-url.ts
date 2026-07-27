@@ -42,6 +42,6 @@ export function getClientAppOrigin(): string {
   return window.location.origin;
 }
 
-export function buildAuthCallbackUrl(origin: string, nextPath = "/home"): string {
+export function buildAuthCallbackUrl(origin: string, nextPath = "/"): string {
   return `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
 }

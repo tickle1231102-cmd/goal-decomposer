@@ -5,7 +5,7 @@ import { buildAuthCallbackUrl, getAppOrigin } from "@/lib/auth-url";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const next = searchParams.get("next") ?? "/home";
+  const next = searchParams.get("next") ?? "/";
   const origin = getAppOrigin(request);
   const redirectTo = buildAuthCallbackUrl(origin, next);
 

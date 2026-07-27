@@ -62,7 +62,7 @@ export default async function GoalPage({ params }: GoalPageProps) {
           </p>
         </div>
         <Button asChild className="shrink-0">
-          <Link href="/home">
+          <Link href="/">
             <Plus className="size-4" />
             새 목표 추가
           </Link>
