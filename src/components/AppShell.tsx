@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
-import { AppHeader } from "@/components/AppHeader";
+import { AppShellClient } from "@/components/AppShellClient";
+import { getGoalsForUser } from "@/lib/goals-list";
 
 type AppShellProps = {
   user: User;
@@ -8,13 +9,12 @@ type AppShellProps = {
   mainClassName?: string;
 };
 
-export function AppShell({ user, children, mainClassName }: AppShellProps) {
+export async function AppShell({ user, children, mainClassName }: AppShellProps) {
+  const goals = await getGoalsForUser(user.id);
+
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader user={user} />
-      <main className={mainClassName ?? "mx-auto max-w-5xl px-4 pb-12 pt-20 sm:px-6 sm:pt-24"}>
-        {children}
-      </main>
-    </div>
+    <AppShellClient user={user} goals={goals} mainClassName={mainClassName}>
+      {children}
+    </AppShellClient>
   );
 }
