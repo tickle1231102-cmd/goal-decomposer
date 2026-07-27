@@ -4,6 +4,53 @@ export type WeekAssignment = {
   weekNumber: number;
 };
 
+/** Parses YYYY-MM-DD as UTC midnight (consistent with plan generate route). */
+export function parseDateOnly(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+/**
+ * Weekday for a date string using getDay convention (0=Sun … 6=Sat).
+ * Uses UTC to stay aligned with parseDateOnly.
+ */
+export function getWeekdayFromDateString(dateStr: string): number {
+  return parseDateOnly(dateStr).getUTCDay();
+}
+
+/** Korean short labels keyed by getDay index (0=일 … 6=토). */
+export const WEEKDAY_LABELS_KO: Record<number, string> = {
+  0: "일",
+  1: "월",
+  2: "화",
+  3: "수",
+  4: "목",
+  5: "금",
+  6: "토",
+};
+
+/** English labels keyed by getDay index (for LLM prompts). */
+export const WEEKDAY_LABELS_EN: Record<number, string> = {
+  0: "Sunday",
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+};
+
+export function isExcludedDate(
+  dateStr: string,
+  excludedWeekdays: number[],
+  excludedDates: string[],
+): boolean {
+  if (excludedDates.includes(dateStr)) {
+    return true;
+  }
+  return excludedWeekdays.includes(getWeekdayFromDateString(dateStr));
+}
+
 /** Returns the Monday (UTC) that starts the Mon–Sun week containing `date`. */
 export function getMondayOfWeek(date: Date): Date {
   const day = date.getUTCDay();
@@ -108,6 +155,44 @@ export function weeklyPlanKey(
   weekNumber: number,
 ): string {
   return `${year}-${month}-${weekNumber}`;
+}
+
+/** Instruction block for LLM prompts describing rest/off-day exclusions. */
+export function exclusionPromptLines(
+  excludedWeekdays: number[],
+  excludedDates: string[],
+): string[] {
+  if (excludedWeekdays.length === 0 && excludedDates.length === 0) {
+    return [];
+  }
+
+  const lines = [
+    "Rest / off-day exclusions (MUST NOT assign dailyTasks on these days):",
+  ];
+
+  if (excludedWeekdays.length > 0) {
+    const labels = [...excludedWeekdays]
+      .sort((a, b) => a - b)
+      .map(
+        (day) =>
+          `${WEEKDAY_LABELS_EN[day]} (${WEEKDAY_LABELS_KO[day]}, weekday index ${day})`,
+      )
+      .join(", ");
+    lines.push(`- Excluded weekdays (every week): ${labels}`);
+  }
+
+  if (excludedDates.length > 0) {
+    lines.push(
+      `- Excluded specific dates: ${[...excludedDates].sort().join(", ")}`,
+    );
+  }
+
+  lines.push(
+    "- Do NOT include any dailyTask whose date falls on an excluded weekday or excluded date.",
+    "- Redistribute workload to adjacent non-excluded days; do not leave planned work undone unless the timeline allows it.",
+  );
+
+  return lines;
 }
 
 /** Instruction block for LLM prompts describing week classification rules. */

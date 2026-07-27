@@ -13,6 +13,9 @@ import {
 } from "@/lib/schematic";
 import {
   getWeekAssignment,
+  isExcludedDate,
+  parseDateOnly,
+  WEEKDAY_LABELS_EN,
   weekClassificationPromptLines,
   weeklyPlanKey,
 } from "@/lib/week-utils";
@@ -23,9 +26,68 @@ const SCOPE_LABELS: Record<GoalInput["scope"], string> = {
   LONG_TERM: "1 year or more",
 };
 
-function parseDateOnly(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
+
+function formatExcludedWeekdays(weekdays: number[]): string {
+  if (weekdays.length === 0) {
+    return "None";
+  }
+  return weekdays
+    .slice()
+    .sort((a, b) => a - b)
+    .map((day) => `${WEEKDAY_LABELS_EN[day]} (${day})`)
+    .join(", ");
+}
+
+function formatExcludedDates(dates: string[]): string {
+  if (dates.length === 0) {
+    return "None";
+  }
+  return dates.slice().sort().join(", ");
+}
+
+function buildRestDayPromptLines(input: GoalInput): string[] {
+  const excludedWeekdays = input.excludedWeekdays ?? [];
+  const excludedDates = input.excludedDates ?? [];
+
+  if (excludedWeekdays.length === 0 && excludedDates.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Rest day / exclusion rules (mandatory):",
+    `- Excluded weekdays (getDay 0=Sun … 6=Sat): ${formatExcludedWeekdays(excludedWeekdays)}`,
+    `- Excluded specific dates: ${formatExcludedDates(excludedDates)}`,
+    "- Do NOT assign any dailyTasks on excluded weekdays or excluded dates.",
+    "- Rest days are intentional gaps — leave them empty; do not backfill tasks onto adjacent days.",
+    "- Weekly focus goals may still mention rest or recovery for excluded days when relevant.",
+  ];
+}
+
+function filterExcludedDailyTasks(
+  actionPlan: ActionPlanOutput,
+  input: GoalInput,
+): ActionPlanOutput {
+  const excludedWeekdays = input.excludedWeekdays ?? [];
+  const excludedDates = input.excludedDates ?? [];
+
+  if (excludedWeekdays.length === 0 && excludedDates.length === 0) {
+    return actionPlan;
+  }
+
+  const beforeCount = actionPlan.dailyTasks.length;
+  const dailyTasks = actionPlan.dailyTasks.filter(
+    (task) => !isExcludedDate(task.date, excludedWeekdays, excludedDates),
+  );
+  const removedCount = beforeCount - dailyTasks.length;
+
+  if (removedCount > 0) {
+    console.warn(
+      `[POST /api/plan/generate] Stripped ${removedCount} dailyTask(s) on excluded dates`,
+    );
+  }
+
+  return { ...actionPlan, dailyTasks };
 }
 
 function buildActionPlanPrompt(input: GoalInput): string {
@@ -39,6 +101,7 @@ function buildActionPlanPrompt(input: GoalInput): string {
     `- Scope: ${input.scope} (${SCOPE_LABELS[input.scope]})`,
     `- Start date: ${input.startDate}`,
     `- End date: ${input.endDate}`,
+    ...buildRestDayPromptLines(input),
     "",
     "Daily task strategy (maximize execution):",
     "- Break work into the smallest actionable units — each dailyTask should be one clear action completable in a single sitting.",
@@ -47,12 +110,12 @@ function buildActionPlanPrompt(input: GoalInput): string {
     "- Keep estimatedMin between 10 and 45 minutes per task; split anything longer into separate tasks.",
     "- Avoid abstract phrasing (e.g. 'study English'); use specific steps (e.g. 'Complete 20 TOEIC listening questions and review 5 wrong answers').",
     "- Include setup steps when they reduce friction (e.g. 'Open Anki deck and review 30 cards').",
-    "- Balance intensity across the week; lighter tasks on weekends if appropriate.",
+    "- Balance intensity across active days; respect excluded rest days.",
     "",
     "Structural requirements:",
     "- Cover the full period from startDate through endDate.",
     "- Assign dailyTasks only on dates within [startDate, endDate] (YYYY-MM-DD).",
-    "- Distribute daily tasks precisely across the date range — avoid large gaps unless realistic rest is intended.",
+    "- Distribute daily tasks across active (non-excluded) days — gaps on rest days are expected and correct.",
     ...weekClassificationPromptLines(),
     "- Keep daily task content concrete and executable within estimatedMin minutes.",
     "- Align monthly themes and weekly focus goals with the yearly summaries.",
@@ -237,7 +300,7 @@ export async function POST(request: Request) {
 
     const geminiModel = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 
-    const { object: actionPlan } = await generateObject({
+    const { object: rawActionPlan } = await generateObject({
       model: google(geminiModel),
       schema: ActionPlanOutputSchema,
       schemaName: "ActionPlanOutput",
@@ -245,6 +308,8 @@ export async function POST(request: Request) {
         "Hierarchical action plan with yearly, monthly, weekly, and daily breakdown",
       prompt: buildActionPlanPrompt(input),
     });
+
+    const actionPlan = filterExcludedDailyTasks(rawActionPlan, input);
 
     const goal = await persistActionPlan(input, actionPlan);
 

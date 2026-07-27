@@ -6,6 +6,12 @@ const dateStringSchema = z
 
 const goalScopeSchema = z.enum(["SHORT_TERM", "MID_TERM", "LONG_TERM"]);
 
+/**
+ * Weekday index matching JavaScript Date.getDay() / date-fns getDay:
+ * 0 = Sunday, 1 = Monday, …, 6 = Saturday.
+ */
+export const weekdaySchema = z.number().int().min(0).max(6);
+
 /** Validates user input before sending to the LLM pipeline. */
 export const GoalInputSchema = z
   .object({
@@ -14,11 +20,45 @@ export const GoalInputSchema = z
     scope: goalScopeSchema,
     startDate: dateStringSchema,
     endDate: dateStringSchema,
+    /** Weekdays to exclude from dailyTasks (0=Sun … 6=Sat, same as getDay). */
+    excludedWeekdays: z.array(weekdaySchema).default([]),
+    /** Specific YYYY-MM-DD dates to exclude from dailyTasks. */
+    excludedDates: z.array(dateStringSchema).default([]),
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: "endDate must be on or after startDate",
     path: ["endDate"],
-  });
+  })
+  .refine(
+    (data) => {
+      const unique = new Set(data.excludedWeekdays);
+      return unique.size === data.excludedWeekdays.length;
+    },
+    {
+      message: "excludedWeekdays must not contain duplicates",
+      path: ["excludedWeekdays"],
+    },
+  )
+  .refine(
+    (data) => {
+      const unique = new Set(data.excludedDates);
+      return unique.size === data.excludedDates.length;
+    },
+    {
+      message: "excludedDates must not contain duplicates",
+      path: ["excludedDates"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.excludedDates.every(
+        (date) => date >= data.startDate && date <= data.endDate,
+      ),
+    {
+      message: "Each excludedDate must fall within [startDate, endDate]",
+      path: ["excludedDates"],
+    },
+  );
 
 /** Validates structured LLM output for the action plan decomposition. */
 export const ActionPlanOutputSchema = z.object({
