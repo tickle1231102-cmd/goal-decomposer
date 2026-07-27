@@ -24,4 +24,10 @@ Site URL can stay as my-planner — Redirect URLs above are required.
 
 Vercel env (goal-decomposer project):
   NEXT_PUBLIC_SITE_URL=https://goal-decomposer-self.vercel.app
-`);
+
+Guest mode (fix "Anonymous sign-ins are disabled"):
+  https://supabase.com/dashboard/project/nnulpjepaearokjujbis/auth/providers
+  → Anonymous sign-ins → Enable
+
+Or: npm run auth:enable-guest  (requires SUPABASE_ACCESS_TOKEN in .env)
+`;

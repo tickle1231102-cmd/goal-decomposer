@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { PlanWorkflowVisualization } from "@/components/PlanWorkflowVisualization";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -425,6 +426,8 @@ export function PlanDashboard({ goal }: PlanDashboardProps) {
         </TabsList>
 
         <TabsContent value="summary" className="mt-4 space-y-4">
+          <PlanWorkflowVisualization goal={goal} tasks={tasks} />
+
           <Card>
             <CardHeader>
               <CardTitle>{goal.title}</CardTitle>

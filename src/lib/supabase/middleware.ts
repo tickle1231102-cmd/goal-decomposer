@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/auth/callback", "/auth/login"];
+const PUBLIC_PATHS = ["/", "/auth/callback", "/auth/login", "/auth/guest"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
@@ -13,7 +13,11 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // OAuth routes manage their own PKCE cookies — do not refresh session here.
-  if (pathname === "/auth/callback" || pathname === "/auth/login") {
+  if (
+    pathname === "/auth/callback" ||
+    pathname === "/auth/login" ||
+    pathname === "/auth/guest"
+  ) {
     return NextResponse.next({ request });
   }
 

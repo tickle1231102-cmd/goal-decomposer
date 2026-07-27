@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
+import { formatAuthError } from "@/lib/auth-errors";
 
 function GoogleIcon() {
   return (
@@ -38,20 +38,12 @@ function GoogleIcon() {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGuestLoading, setIsGuestLoading] = useState(false);
-  const [error, setError] = useState<string | null>(() => {
-    const authError = searchParams.get("error");
-    if (authError === "auth_callback_failed") {
-      return "Google 로그인에 실패했습니다. 다시 시도해주세요.";
-    }
-    if (authError === "auth_start_failed") {
-      return "Google 로그인을 시작하지 못했습니다. Supabase Redirect URL 설정을 확인해주세요.";
-    }
-    return null;
-  });
+  const [error, setError] = useState<string | null>(() =>
+    formatAuthError(searchParams.get("error")),
+  );
 
   function handleGoogleLogin() {
     setError(null);
@@ -59,30 +51,10 @@ export function LoginForm() {
     window.location.assign("/auth/login?next=/");
   }
 
-  async function handleGuestLogin() {
+  function handleGuestLogin() {
     setError(null);
     setIsGuestLoading(true);
-
-    try {
-      const supabase = createClient();
-
-      const { error: guestError } = await supabase.auth.signInAnonymously();
-
-      if (guestError) {
-        throw guestError;
-      }
-
-      router.push("/");
-      router.refresh();
-    } catch (loginError) {
-      setError(
-        loginError instanceof Error
-          ? loginError.message
-          : "게스트 모드 시작에 실패했습니다.",
-      );
-    } finally {
-      setIsGuestLoading(false);
-    }
+    window.location.assign("/auth/guest");
   }
 
   const isLoading = isGoogleLoading || isGuestLoading;
