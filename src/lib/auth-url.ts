@@ -1,47 +1,89 @@
 /**
- * Canonical app URL for OAuth redirects.
- * Set NEXT_PUBLIC_APP_URL in production (Vercel) to this app's domain.
+ * Resolve this app's public origin for OAuth callbacks.
+ * Follows Supabase guidance for Vercel deployments.
  */
-export function getConfiguredAppUrl(): string | undefined {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+function normalizeOrigin(value: string): string {
+  let url = value.trim().replace(/\/$/, "");
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  return url.replace(/\/$/, "");
+}
+
+function readConfiguredSiteUrl(): string | undefined {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_VERCEL_URL;
+
+  if (!siteUrl) {
+    return undefined;
+  }
+
+  return normalizeOrigin(siteUrl);
+}
+
+function hostsMatch(a: string, b: string): boolean {
+  try {
+    return new URL(a).host === new URL(b).host;
+  } catch {
+    return false;
+  }
 }
 
 export function getAppOrigin(request: Request): string {
-  const configured = getConfiguredAppUrl();
-  if (configured) {
-    return configured;
-  }
-
   const forwardedHost = request.headers.get("x-forwarded-host");
   const forwardedProto = request.headers.get("x-forwarded-proto") ?? "https";
 
   if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
+    const liveOrigin = normalizeOrigin(`${forwardedProto}://${forwardedHost}`);
+    const configured = readConfiguredSiteUrl();
 
-  return new URL(request.url).origin;
-}
+    if (!configured) {
+      return liveOrigin;
+    }
 
-/** Client-side: prefer live origin when env points to a different host. */
-export function getClientAppOrigin(): string {
-  if (typeof window === "undefined") {
-    return getConfiguredAppUrl() ?? "";
-  }
-
-  const configured = getConfiguredAppUrl();
-  if (configured) {
     try {
-      if (new URL(configured).host === window.location.host) {
-        return configured;
+      const configuredHost = new URL(configured).host;
+
+      if (
+        configuredHost.startsWith("localhost") ||
+        configuredHost.startsWith("127.0.0.1")
+      ) {
+        return liveOrigin;
       }
     } catch {
-      // ignore invalid configured URL
+      return liveOrigin;
     }
+
+    return hostsMatch(configured, liveOrigin) ? configured : liveOrigin;
   }
 
-  return window.location.origin;
+  const configured = readConfiguredSiteUrl();
+  if (configured) {
+    return configured;
+  }
+
+  return normalizeOrigin(new URL(request.url).origin);
+}
+
+/** Client-side origin for OAuth — always prefer the current browser host. */
+export function getClientAppOrigin(): string {
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return readConfiguredSiteUrl() ?? "";
 }
 
 export function buildAuthCallbackUrl(origin: string, nextPath = "/"): string {
   return `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
 }
+
+export const REQUIRED_SUPABASE_REDIRECT_URLS = [
+  "https://goal-decomposer-self.vercel.app/auth/callback",
+  "https://goal-decomposer-self.vercel.app/**",
+  "http://localhost:3000/auth/callback",
+  "http://localhost:3000/**",
+  "https://*-goal-decomposer*.vercel.app/**",
+] as const;

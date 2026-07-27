@@ -12,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buildAuthCallbackUrl, getClientAppOrigin } from "@/lib/auth-url";
 import { createClient } from "@/lib/supabase/client";
 
 function GoogleIcon() {
@@ -54,38 +53,10 @@ export function LoginForm() {
     return null;
   });
 
-  async function handleGoogleLogin() {
+  function handleGoogleLogin() {
     setError(null);
     setIsGoogleLoading(true);
-
-    try {
-      const supabase = createClient();
-      const origin = getClientAppOrigin();
-      const redirectTo = buildAuthCallbackUrl(origin, "/");
-
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-          queryParams: {
-            prompt: "select_account",
-          },
-        },
-      });
-
-      if (oauthError || !data.url) {
-        throw oauthError ?? new Error("Google 로그인 URL을 받지 못했습니다.");
-      }
-
-      window.location.assign(data.url);
-    } catch (loginError) {
-      setError(
-        loginError instanceof Error
-          ? loginError.message
-          : "Google 로그인에 실패했습니다.",
-      );
-      setIsGoogleLoading(false);
-    }
+    window.location.assign("/auth/login?next=/");
   }
 
   async function handleGuestLogin() {

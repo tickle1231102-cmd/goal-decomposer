@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const origin = getAppOrigin(request);
   const redirectTo = buildAuthCallbackUrl(origin, next);
 
-  let cookieCarrier = NextResponse.next({ request });
+  let response = NextResponse.redirect(`${origin}/?error=auth_start_failed`);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value);
-            cookieCarrier.cookies.set(name, value, options);
+            response.cookies.set(name, value, options);
           });
         },
       },
@@ -40,14 +40,11 @@ export async function GET(request: NextRequest) {
   });
 
   if (error || !data.url) {
-    console.error("[GET /auth/login]", error?.message);
-    return NextResponse.redirect(`${origin}/?error=auth_start_failed`);
+    console.error("[GET /auth/login]", error?.message, { redirectTo });
+    return response;
   }
 
-  const oauthRedirect = NextResponse.redirect(data.url);
-  cookieCarrier.cookies.getAll().forEach((cookie) => {
-    oauthRedirect.cookies.set(cookie.name, cookie.value);
+  return NextResponse.redirect(data.url, {
+    headers: response.headers,
   });
-
-  return oauthRedirect;
 }
