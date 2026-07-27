@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
+import { AppShell } from "@/components/AppShell";
 import { PlanDashboard } from "@/components/PlanDashboard";
 import { Button } from "@/components/ui/button";
 import { requireCurrentUser } from "@/lib/auth";
@@ -53,8 +54,8 @@ export default async function GoalPage({ params }: GoalPageProps) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <AppShell user={user} mainClassName="mx-auto max-w-4xl px-4 pb-12 pt-20 sm:px-6 sm:pt-24">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{goal.title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -69,6 +70,6 @@ export default async function GoalPage({ params }: GoalPageProps) {
         </Button>
       </div>
       <PlanDashboard goal={serializeGoal(goal)} />
-    </main>
+    </AppShell>
   );
 }

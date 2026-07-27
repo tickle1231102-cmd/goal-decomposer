@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { PlanDailyTask, PlanGoal } from "@/lib/plan-types";
@@ -18,11 +17,7 @@ import { cn } from "@/lib/utils";
 
 type WorkflowStep = {
   id: string;
-  label: string;
-  sublabel: string;
-  count: number;
-  countLabel: string;
-  detail: string;
+  keywords: string;
   icon: LucideIcon;
   accent: string;
 };
@@ -32,103 +27,82 @@ type PlanWorkflowVisualizationProps = {
   tasks: PlanDailyTask[];
 };
 
+function truncateText(text: string, maxLength: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+function joinUniqueKeywords(items: string[], maxItems: number, maxLength: number) {
+  const unique = [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+  const joined = unique.slice(0, maxItems).join(" · ");
+  return joined ? truncateText(joined, maxLength) : "—";
+}
+
 function buildWorkflowSteps(
   goal: PlanGoal,
   tasks: PlanDailyTask[],
 ): WorkflowStep[] {
-  const monthlyCount = goal.yearlyPlans.reduce(
-    (total, yearlyPlan) => total + yearlyPlan.monthlyPlans.length,
-    0,
+  const yearlyKeywords = joinUniqueKeywords(
+    goal.yearlyPlans.map((plan) => plan.summary),
+    2,
+    72,
   );
-  const weeklyCount = goal.yearlyPlans.reduce(
-    (total, yearlyPlan) =>
-      total +
-      yearlyPlan.monthlyPlans.reduce(
-        (monthTotal, monthlyPlan) => monthTotal + monthlyPlan.weeklyPlans.length,
-        0,
-      ),
-    0,
+
+  const monthlyKeywords = joinUniqueKeywords(
+    goal.yearlyPlans.flatMap((yearlyPlan) =>
+      yearlyPlan.monthlyPlans.map((monthlyPlan) => monthlyPlan.theme),
+    ),
+    3,
+    72,
   );
-  const completedTasks = tasks.filter(
-    (task) => task.status === "COMPLETED",
-  ).length;
-  const completionRate =
-    tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-  const yearRange =
-    goal.yearlyPlans.length > 0
-      ? goal.yearlyPlans.map((plan) => plan.year).join(" · ")
-      : "—";
-
-  const monthSample = goal.yearlyPlans
-    .flatMap((yearlyPlan) =>
-      yearlyPlan.monthlyPlans.map(
-        (monthlyPlan) => `${monthlyPlan.year}.${monthlyPlan.month}`,
-      ),
-    )
-    .slice(0, 3)
-    .join(", ");
-
-  const weekSample = goal.yearlyPlans
-    .flatMap((yearlyPlan) =>
+  const weeklyKeywords = joinUniqueKeywords(
+    goal.yearlyPlans.flatMap((yearlyPlan) =>
       yearlyPlan.monthlyPlans.flatMap((monthlyPlan) =>
-        monthlyPlan.weeklyPlans.map(
-          (weeklyPlan) =>
-            `${weeklyPlan.month}월 ${weeklyPlan.weekNumber}주`,
-        ),
+        monthlyPlan.weeklyPlans.map((weeklyPlan) => weeklyPlan.focusGoal),
       ),
-    )
-    .slice(0, 3)
-    .join(", ");
+    ),
+    3,
+    72,
+  );
+
+  const dailyKeywords = joinUniqueKeywords(
+    tasks.map((task) => task.content),
+    4,
+    80,
+  );
 
   return [
     {
       id: "goal",
-      label: "목표",
-      sublabel: "Goal",
-      count: 1,
-      countLabel: "최종 목표",
-      detail: goal.title,
+      keywords: truncateText(goal.title, 48),
       icon: Target,
       accent: "bg-primary text-primary-foreground",
     },
     {
       id: "yearly",
-      label: "연간",
-      sublabel: "Year",
-      count: goal.yearlyPlans.length,
-      countLabel: "연간 계획",
-      detail: yearRange,
+      keywords: yearlyKeywords,
       icon: CalendarRange,
       accent: "bg-blue-600 text-white",
     },
     {
       id: "monthly",
-      label: "월간",
-      sublabel: "Month",
-      count: monthlyCount,
-      countLabel: "월간 테마",
-      detail: monthSample ? `${monthSample}${monthlyCount > 3 ? " …" : ""}` : "—",
+      keywords: monthlyKeywords,
       icon: Calendar,
       accent: "bg-violet-600 text-white",
     },
     {
       id: "weekly",
-      label: "주간",
-      sublabel: "Week",
-      count: weeklyCount,
-      countLabel: "주간 포커스",
-      detail: weekSample ? `${weekSample}${weeklyCount > 3 ? " …" : ""}` : "—",
+      keywords: weeklyKeywords,
       icon: CalendarDays,
       accent: "bg-amber-600 text-white",
     },
     {
       id: "daily",
-      label: "일간",
-      sublabel: "Day",
-      count: tasks.length,
-      countLabel: "실행 과제",
-      detail: `${completedTasks}/${tasks.length} 완료 · ${completionRate}%`,
+      keywords: dailyKeywords,
       icon: CheckSquare,
       accent: "bg-emerald-600 text-white",
     },
@@ -157,25 +131,15 @@ function WorkflowNode({ step }: { step: WorkflowStep }) {
     <div className="flex min-w-0 flex-1 flex-col items-center">
       <div
         className={cn(
-          "flex size-11 items-center justify-center rounded-2xl shadow-sm",
+          "flex size-10 items-center justify-center rounded-2xl shadow-sm sm:size-11",
           step.accent,
         )}
       >
-        <Icon className="size-5" />
+        <Icon className="size-4 sm:size-5" />
       </div>
       <div className="mt-3 w-full rounded-xl border bg-card p-3 text-center shadow-sm">
-        <div className="flex items-center justify-center gap-1.5">
-          <p className="text-sm font-semibold">{step.label}</p>
-          <Badge variant="secondary" className="text-[10px] uppercase">
-            {step.sublabel}
-          </Badge>
-        </div>
-        <p className="mt-2 text-2xl font-semibold tracking-tight">
-          {step.count}
-        </p>
-        <p className="text-xs text-muted-foreground">{step.countLabel}</p>
-        <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-          {step.detail}
+        <p className="line-clamp-4 text-sm font-medium leading-6 text-foreground">
+          {step.keywords}
         </p>
       </div>
     </div>
@@ -196,17 +160,7 @@ export function PlanWorkflowVisualization({
   return (
     <Card className="overflow-hidden">
       <CardHeader className="border-b bg-muted/20 pb-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <CardTitle className="text-base">플랜 워크플로우</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              목표에서 일간 실행 과제까지 자동 분해된 전체 실행 흐름입니다.
-            </p>
-          </div>
-          <Badge variant="outline" className="w-fit shrink-0">
-            Goal → Year → Month → Week → Day
-          </Badge>
-        </div>
+        <CardTitle className="text-base">플랜 워크플로우</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
         <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-start md:gap-1">
@@ -225,33 +179,12 @@ export function PlanWorkflowVisualization({
 
         <div className="rounded-xl border bg-muted/20 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">일간 실행 진행률</p>
+            <p className="text-sm font-medium">실행 진행률</p>
             <span className="text-sm text-muted-foreground">
-              {completedTasks} / {tasks.length} 완료
+              {completedTasks} / {tasks.length} ({completionRate}%)
             </span>
           </div>
           <Progress value={completionRate} className="h-2" />
-          <p className="mt-2 text-xs text-muted-foreground">
-            상위 계획(연·월·주)은 방향을 잡고, 일간 To-Do에서 실제 실행을
-            체크합니다.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border px-3 py-2 text-sm">
-            <p className="text-xs text-muted-foreground">기간</p>
-            <p className="mt-1 font-medium">
-              {goal.startDate} ~ {goal.endDate}
-            </p>
-          </div>
-          <div className="rounded-lg border px-3 py-2 text-sm">
-            <p className="text-xs text-muted-foreground">분해 단계</p>
-            <p className="mt-1 font-medium">5단계 (목표 → 일간)</p>
-          </div>
-          <div className="rounded-lg border px-3 py-2 text-sm">
-            <p className="text-xs text-muted-foreground">총 실행 단위</p>
-            <p className="mt-1 font-medium">{tasks.length}개 일간 과제</p>
-          </div>
         </div>
       </CardContent>
     </Card>
